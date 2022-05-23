@@ -1,16 +1,5 @@
 package com.udacity.vehicles.api;
 
-import static org.hamcrest.Matchers.hasSize;
-import static org.hamcrest.Matchers.is;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.BDDMockito.given;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 import com.udacity.vehicles.client.maps.MapsClient;
 import com.udacity.vehicles.client.prices.PriceClient;
 import com.udacity.vehicles.domain.Condition;
@@ -18,9 +7,8 @@ import com.udacity.vehicles.domain.Location;
 import com.udacity.vehicles.domain.car.Car;
 import com.udacity.vehicles.domain.car.Details;
 import com.udacity.vehicles.domain.manufacturer.Manufacturer;
+import com.udacity.vehicles.service.CarNotFoundException;
 import com.udacity.vehicles.service.CarService;
-import java.net.URI;
-import java.util.Collections;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -34,6 +22,20 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.net.URI;
+import java.util.Collections;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 /**
  * Implements testing of the CarController class.
  */
@@ -43,6 +45,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @AutoConfigureJsonTesters
 public class CarControllerTest {
 
+    private static final long ID_CAR = 1L;
     @Autowired
     private MockMvc mvc;
 
@@ -64,7 +67,7 @@ public class CarControllerTest {
     @Before
     public void setup() {
         Car car = getCar();
-        car.setId(1L);
+        car.setId(ID_CAR);
         given(carService.save(any())).willReturn(car);
         given(carService.findById(any())).willReturn(car);
         given(carService.list()).willReturn(Collections.singletonList(car));
@@ -96,7 +99,13 @@ public class CarControllerTest {
          *   the whole list of vehicles. This should utilize the car from `getCar()`
          *   below (the vehicle will be the first in the list).
          */
-
+        mvc.perform(
+                        get(new URI("/cars"))
+                                .contentType(MediaType.APPLICATION_JSON_UTF8)
+                                .accept(MediaType.APPLICATION_JSON_UTF8))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8))
+                .andExpect(jsonPath("$._embedded.carList[0].id").value(ID_CAR));
     }
 
     /**
@@ -109,6 +118,32 @@ public class CarControllerTest {
          * TODO: Add a test to check that the `get` method works by calling
          *   a vehicle by ID. This should utilize the car from `getCar()` below.
          */
+        mvc.perform(
+                        get(new URI(String.format("/cars/%d", ID_CAR)))
+                                .contentType(MediaType.APPLICATION_JSON_UTF8)
+                                .accept(MediaType.APPLICATION_JSON_UTF8))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8))
+                .andExpect(jsonPath("$.id").value(ID_CAR));
+    }
+
+
+    /**
+     * Tests the read operation for a single car by ID.
+     * @throws Exception if the read operation for a single car fails
+     */
+    @Test
+    public void findCarNonFound() throws Exception {
+        /**
+         * TODO: Add a test to check that the `get` method works by calling
+         *   a vehicle by ID. This should utilize the car from `getCar()` below.
+         */
+        given(carService.findById(any())).willThrow(new CarNotFoundException());
+        mvc.perform(
+                        get(new URI(String.format("/cars/%d", 2)))
+                                .contentType(MediaType.APPLICATION_JSON_UTF8)
+                                .accept(MediaType.APPLICATION_JSON_UTF8))
+                .andExpect(status().isNotFound());
     }
 
     /**
@@ -122,6 +157,31 @@ public class CarControllerTest {
          *   when the `delete` method is called from the Car Controller. This
          *   should utilize the car from `getCar()` below.
          */
+        doNothing().when(carService).delete(ID_CAR);
+
+        mvc.perform(delete(new URI("/cars/1"))
+                        .contentType(MediaType.APPLICATION_JSON_UTF8)
+                        .accept(MediaType.APPLICATION_JSON_UTF8))
+                .andExpect(status().isNoContent());
+    }
+
+    /**
+     * Tests the deletion of a single car by ID with not found
+     * @throws Exception if the delete operation of a vehicle fails
+     */
+    @Test
+    public void deleteCarNotFound() throws Exception {
+        /**
+         * TODO: Add a test to check whether a vehicle is appropriately deleted
+         *   when the `delete` method is called from the Car Controller. This
+         *   should utilize the car from `getCar()` below.
+         */
+        doThrow(new CarNotFoundException()).when(carService).delete(ID_CAR);
+
+        mvc.perform(delete(new URI(String.format("/cars/%d", 2)))
+                        .contentType(MediaType.APPLICATION_JSON_UTF8)
+                        .accept(MediaType.APPLICATION_JSON_UTF8))
+                .andExpect(status().isNoContent());
     }
 
     /**
