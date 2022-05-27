@@ -36,7 +36,7 @@ public class PricingControllerTest {
     }
 
     @Test
-    public void getTestNonFound() throws Exception {
+    public void getTestNotFound() throws Exception {
         mvc.perform(
                         get(new URI("/services/price?vehicleId=100"))
                                 .contentType(MediaType.APPLICATION_JSON_UTF8)
